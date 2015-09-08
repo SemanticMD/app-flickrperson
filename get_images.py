@@ -15,53 +15,36 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import urllib
-import urllib2
-import re
+import requests
 import json
-import string
 
+def get_he_images(tag_name):
+    output = None
 
-def get_flickr_photos(size="big"):
-    """
-    Gets public photos from Flickr feeds
-    :arg string size: Size of the image from Flickr feed.
-    :returns: A list of photos.
-    :rtype: list
-    """
-    # Get the ID of the photos and load it in the output var
-    # add the 'ids': '25053835@N03' to the values dict if you want to
-    # specify a Flickr Person ID
-    print('Contacting Flickr for photos')
-    url = "http://api.flickr.com/services/feeds/photos_public.gne"
-    values = {'nojsoncallback': 1,
-              'format': "json"}
+    try:
+        print('Contacting SemanticMD for images')
+        my_url = "https://api.semantic.md/tag/" + tag_name
 
-    query = url + "?" + urllib.urlencode(values)
-    urlobj = urllib2.urlopen(query)
-    data = urlobj.read()
-    urlobj.close()
-    # The returned JSON object by Flickr is not correctly escaped,
-    # so we have to fix it see
-    # http://goo.gl/A9VNo
-    regex = re.compile(r'\\(?![/u"])')
-    fixed = regex.sub(r"\\\\", data)
-    output = json.loads(fixed)
-    print('Data retrieved from Flickr')
+        r = requests.get(url=my_url)
+        output = r.json()['tag_images']
+        print('Data retrieved from SemanticMD')
+    except:
+        print('Data not retrieved!')
+        return False
 
     # For each photo ID create its direct URL according to its size:
     # big, medium, small (or thumbnail) + Flickr page hosting the photo
-    photos = []
-    for idx, photo in enumerate(output['items']):
-        print 'Retrieved photo: %s' % idx
-        imgUrl_m = photo["media"]["m"]
-        imgUrl_b = string.replace(photo["media"]["m"], "_m.jpg", "_b.jpg")
-        photos.append({'link': photo["link"], 'url_m':  imgUrl_m,
-                       'url_b': imgUrl_b})
-    return photos
+    tasks = []
+    headings = 'question,url_m,link,url_b'
+    tasks.append(headings)
+    question = 'Do you see an artifact in this image?'
+    for img_url in output:
+        img_url_clean = img_url.encode('utf-8')
+        tasks.append(",".join([question, img_url_clean, img_url_clean, img_url_clean]))
+    return tasks
 
 if __name__ == '__main__':
-    file = open('flickr_tasks.json', 'w')
-    photos = get_flickr_photos()
-    file.write(json.dumps(photos))
-    file.close()
+    outfile = open('pbs_tasks.csv', 'w')
+    tasks = get_he_images('dfs-present')
+    print >> outfile, "\n".join(str(i) for i in tasks)
+    outfile.close()
